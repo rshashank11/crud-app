@@ -21,7 +21,7 @@ app = FastAPI()
 def health_check():
     return {"status": "online"}
 
-app = gr.mount_gradio_app(app, demo, path="/")
+
 
 
 @app.get("/authors/search", response_model=List[schemas.AuthorResponse])
@@ -190,3 +190,4 @@ def semantic_review_search(sentiment: str, db: Session = Depends(get_session)):
     ]
 
 
+app = gr.mount_gradio_app(app, demo, path="/")

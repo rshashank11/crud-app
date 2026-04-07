@@ -23,7 +23,9 @@ def health_check():
 
 @app.post("/authors", response_model=schemas.AuthorResponse, status_code=201)
 def create_author(author_data: schemas.AuthorCreate, db: Session = Depends(get_session)):
-    new_author = Author(name=author_data.name, bio=author_data.bio)
+    bio_to_embed = f"{author_data.bio}"
+    bio_vector = get_embedding(bio_to_embed)
+    new_author = Author(name=author_data.name, bio=author_data.bio, embedding=bio_vector)
     db.add(new_author)
     db.commit()
     db.refresh(new_author)
@@ -37,6 +39,31 @@ def get_all_authors(db: Session = Depends(get_session)):
 def search_authors(q: str, db: Session = Depends(get_session)):
     authors = db.query(Author).filter(Author.name.ilike(f"%{q}%")).limit(20).all()
     return authors
+
+@app.get("/authors/rag-search")
+def author_rag_search(q: str, db: Session = Depends(get_session)):
+    search_vector = get_embedding(q)
+
+    results = db.query(Author).order_by(
+        Author.embedding.cosine_distance(search_vector)
+    ).limit(5).all()
+
+    context_text = "\n".join([
+        f"Author: {a.name}, Bio: {a.bio}"
+        for a in results
+    ])
+
+    prompt = f"Use the following author information to answer the question. Context: {context_text} Question: {q}"
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    return {
+        "answer": response.choices[0].message.content,
+        "sources": [a.name for a in results]
+    }
 
 @app.put("/authors/{author_id}", response_model=schemas.AuthorResponse)
 def update_author(author_id: UUID, author_data: schemas.AuthorUpdate, db: Session = Depends(get_session)):
@@ -107,7 +134,17 @@ def create_book(book_data: schemas.BookCreate, db: Session = Depends(get_session
     author = db.query(Author).filter(Author.id == book_data.author_id).first()
     if not author:
         raise HTTPException(status_code=404, detail="Author ID does not exist")
-    new_book = Book(title=book_data.title, author_id=book_data.author_id, synopsis=book_data.synopsis)
+    
+    text_to_embed = f"{book_data.title} {book_data.synopsis or ''}"
+    book_vector = get_embedding(text_to_embed)
+    
+    new_book = Book(
+        title=book_data.title, 
+        author_id=book_data.author_id, 
+        synopsis=book_data.synopsis,
+        embedding=book_vector
+    )
+    
     db.add(new_book)
     db.commit()
     db.refresh(new_book)

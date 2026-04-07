@@ -66,7 +66,25 @@ def delete_review(review_id):
     requests.delete(f"{API_URL}/reviews/{review_id}")
     return fetch_reviews()
 
-with gr.Blocks() as demo:
+def search_authors_manage(q):
+    if not q:
+        return fetch_authors()
+    res = requests.get(f"{API_URL}/authors/search", params={"q": q})
+    return [[a["id"], a["name"], a["bio"]] for a in res.json()]
+
+def search_authors_rag(q):
+    if not q:
+        return "Please enter a question.", []
+    try:
+        res = requests.get(f"{API_URL}/authors/rag-search", params={"q": q})
+        if res.status_code == 200:
+            data = res.json()
+            return data["answer"], [[s] for s in data["sources"]]
+        return f"Error: {res.status_code}", []
+    except Exception as e:
+        return str(e), []
+
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("# Library Management System")
     
     with gr.Tab("Search & AI"):
@@ -86,14 +104,11 @@ with gr.Blocks() as demo:
         with gr.Row():
             auth_search_name = gr.Textbox(label="1. Search Author Name")
             auth_search_btn = gr.Button("Find ID")
-        
         a_id_dropdown = gr.Dropdown(label="2. Select Author", choices=[])
-        
         with gr.Row():
             t_in = gr.Textbox(label="3. Title")
             syn_in = gr.Textbox(label="4. Synopsis")
             add_b_btn = gr.Button("Add Book")
-            
         b_df = gr.Dataframe(headers=["ID", "Title", "Author"])
         del_b_id = gr.Textbox(label="Book ID to Delete")
         del_b_btn = gr.Button("Delete Book")
@@ -104,14 +119,23 @@ with gr.Blocks() as demo:
         demo.load(fetch_books, outputs=b_df)
 
     with gr.Tab("Manage Authors"):
+        gr.Markdown("### Author Search and AI Research")
         with gr.Row():
-            n_in = gr.Textbox(label="Name")
-            b_in = gr.Textbox(label="Bio")
-            add_a_btn = gr.Button("Add Author")
+            auth_search_input = gr.Textbox(label="Keyword Search or AI Question")
+            auth_key_btn = gr.Button("Keyword Search")
+            auth_rag_btn = gr.Button("Ask AI about Authors")
+        auth_rag_answer = gr.Textbox(label="AI Librarian Answer", interactive=False)
         a_df = gr.Dataframe(headers=["ID", "Name", "Bio"])
-        del_a_id = gr.Textbox(label="Author ID to Delete")
-        del_a_btn = gr.Button("Delete Author")
+        with gr.Row():
+            n_in = gr.Textbox(label="New Author Name")
+            b_in = gr.Textbox(label="New Author Bio")
+            add_a_btn = gr.Button("Add Author")
+        with gr.Row():
+            del_a_id = gr.Textbox(label="Author ID to Delete")
+            del_a_btn = gr.Button("Delete Author")
         
+        auth_key_btn.click(search_authors_manage, inputs=auth_search_input, outputs=a_df)
+        auth_rag_btn.click(search_authors_rag, inputs=auth_search_input, outputs=[auth_rag_answer, a_df])
         add_a_btn.click(add_author, inputs=[n_in, b_in], outputs=a_df)
         del_a_btn.click(delete_author, inputs=del_a_id, outputs=a_df)
         demo.load(fetch_authors, outputs=a_df)
@@ -120,6 +144,5 @@ with gr.Blocks() as demo:
         r_df = gr.Dataframe(headers=["ID", "Comment", "Rating"])
         del_r_id = gr.Textbox(label="Review ID to Delete")
         del_r_btn = gr.Button("Delete Review")
-        
         del_r_btn.click(delete_review, inputs=del_r_id, outputs=r_df)
         demo.load(fetch_reviews, outputs=r_df)

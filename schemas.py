@@ -6,7 +6,6 @@ class AuthorBase(BaseModel):
     bio: str | None = None
 
 class AuthorCreate(AuthorBase):
-    # Used pass here cause there is no need to do anything, inherit the fields that are required from AuthorBase itself.
     pass 
 
 class AuthorUpdate(BaseModel):
@@ -29,9 +28,9 @@ class ReviewResponse(ReviewBase):
     book_id: UUID4
     model_config = ConfigDict(from_attributes=True)
 
-
 class BookBase(BaseModel):
     title: str
+    synopsis: str | None = None # Added this here so it's available in Create/Update/Response
 
 class BookCreate(BookBase):
     author_id: UUID4
@@ -44,7 +43,6 @@ class BookUpdate(BaseModel):
 class BookResponse(BookBase):
     id: UUID4
     author_id: UUID4
-    synopsis: str | None = None
     author: AuthorResponse
     reviews: List[ReviewResponse] = []
     model_config = ConfigDict(from_attributes=True)

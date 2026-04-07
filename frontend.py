@@ -4,6 +4,19 @@ import requests
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
+def search_authors_for_book(name):
+    if not name:
+        return gr.Dropdown(choices=[])
+    try:
+        res = requests.get(f"{API_URL}/authors/search", params={"q": name})
+        if res.status_code == 200:
+            authors = res.json()
+            choices = [(a["name"], a["id"]) for a in authors]
+            return gr.Dropdown(choices=choices)
+        return gr.Dropdown(choices=[])
+    except Exception:
+        return gr.Dropdown(choices=[])
+
 def search_books_keyword(q):
     res = requests.get(f"{API_URL}/books/search", params={"q": q})
     return [[b["title"], b.get("synopsis", "")] for b in res.json()]
@@ -22,6 +35,8 @@ def fetch_books():
     return [[b["id"], b["title"], b.get("author", {}).get("name", "N/A")] for b in res.json()]
 
 def add_book(title, author_id, synopsis):
+    if not author_id:
+        return fetch_books()
     payload = {"title": title, "author_id": author_id, "synopsis": synopsis}
     requests.post(f"{API_URL}/books", json=payload)
     return fetch_books()
@@ -69,15 +84,22 @@ with gr.Blocks() as demo:
 
     with gr.Tab("Manage Books"):
         with gr.Row():
-            t_in = gr.Textbox(label="Title")
-            a_id_in = gr.Textbox(label="Author ID")
-            syn_in = gr.Textbox(label="Synopsis")
+            auth_search_name = gr.Textbox(label="1. Search Author Name")
+            auth_search_btn = gr.Button("Find ID")
+        
+        a_id_dropdown = gr.Dropdown(label="2. Select Author", choices=[])
+        
+        with gr.Row():
+            t_in = gr.Textbox(label="3. Title")
+            syn_in = gr.Textbox(label="4. Synopsis")
             add_b_btn = gr.Button("Add Book")
+            
         b_df = gr.Dataframe(headers=["ID", "Title", "Author"])
         del_b_id = gr.Textbox(label="Book ID to Delete")
         del_b_btn = gr.Button("Delete Book")
         
-        add_b_btn.click(add_book, inputs=[t_in, a_id_in, syn_in], outputs=b_df)
+        auth_search_btn.click(search_authors_for_book, inputs=auth_search_name, outputs=a_id_dropdown)
+        add_b_btn.click(add_book, inputs=[t_in, a_id_dropdown, syn_in], outputs=b_df)
         del_b_btn.click(delete_book, inputs=del_b_id, outputs=b_df)
         demo.load(fetch_books, outputs=b_df)
 

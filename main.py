@@ -148,7 +148,6 @@ def create_book(book_data: schemas.BookCreate, db: Session = Depends(get_session
     
     db.add(new_book)
     db.commit()
-    db.refresh(new_book)
     return new_book
 
 @app.put("/books/{book_id}", response_model=schemas.BookResponse)

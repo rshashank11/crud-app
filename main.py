@@ -6,14 +6,15 @@ import gradio as gr
 from database import get_session
 from models import Book, Author, Review
 import schemas
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 import os
 from dotenv import load_dotenv
 from frontend import demo
+import time
 
 load_dotenv()
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
 
@@ -131,13 +132,13 @@ def get_specific_book(book_id: UUID, db: Session = Depends(get_session)):
     return book
 
 @app.post("/books", response_model=schemas.BookResponse, status_code=201)
-def create_book(book_data: schemas.BookCreate, db: Session = Depends(get_session)):
+async def create_book(book_data: schemas.BookCreate, db: Session = Depends(get_session)):
     author = db.query(Author).filter(Author.id == book_data.author_id).first()
     if not author:
         raise HTTPException(status_code=404, detail="Author ID does not exist")
     
     text_to_embed = f"{book_data.title} {book_data.synopsis or ''}"
-    book_vector = get_embedding(text_to_embed)
+    book_vector = await get_embedding(text_to_embed)
     
     new_book = Book(
         title=book_data.title, 
@@ -194,8 +195,10 @@ def delete_review(review_id: UUID, db: Session = Depends(get_session)):
     db.delete(review)
     db.commit()
 
-def get_embedding(text:str):
-    response = client.embeddings.create(input=[text], model='text-embedding-3-small')
+async def get_embedding(text: str):
+    start_time = time.time()
+    response = await client.embeddings.create(input=[text], model='text-embedding-3-small')
+    print(f"DEBUG: OpenAI embedding took {time.time() - start_time:.2f}s")
     return response.data[0].embedding
 
 @app.get("/authors/semantic-search")

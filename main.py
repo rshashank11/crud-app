@@ -139,7 +139,7 @@ async def create_book(book_data: schemas.BookCreate, db: Session = Depends(get_s
     
     text_to_embed = f"{book_data.title} {book_data.synopsis or ''}"
     book_vector = await get_embedding(text_to_embed)
-    
+    db_start = time.time()
     new_book = Book(
         title=book_data.title, 
         author_id=book_data.author_id, 
@@ -149,6 +149,7 @@ async def create_book(book_data: schemas.BookCreate, db: Session = Depends(get_s
     
     db.add(new_book)
     db.commit()
+    print(f"DEBUG: Database Latency: {time.time() - db_start:.2f}s")
     return new_book
 
 @app.put("/books/{book_id}", response_model=schemas.BookResponse)

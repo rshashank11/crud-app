@@ -25,10 +25,11 @@ def health_check():
 def create_author(author_data: schemas.AuthorCreate, db: Session = Depends(get_session)):
     bio_to_embed = f"{author_data.bio}"
     bio_vector = get_embedding(bio_to_embed)
+    print("DEBUG: Embedding generated")
     new_author = Author(name=author_data.name, bio=author_data.bio, embedding=bio_vector)
     db.add(new_author)
     db.commit()
-    db.refresh(new_author)
+    print("DEBUG: Author committed to DB")
     return new_author
 
 @app.get("/authors", response_model=List[schemas.AuthorResponse])
